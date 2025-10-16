@@ -58,11 +58,11 @@ else:
     from cython.cimports.cpython import PyTuple_SET_ITEM
     from cython.cimports.cpython import PySequence_Fast_GET_SIZE
 
+_attr_not_found = object()
 
 @cython.cclass
 class BaseRow:
-    if not cython.compiled:
-        __slots__ = ("_parent", "_data", "_key_to_index")
+    __slots__ = ("_parent", "_data", "_key_to_index")
 
     if cython.compiled:
         _parent: ResultMetaData = cython.declare(object, visibility="readonly")
@@ -134,12 +134,13 @@ class BaseRow:
     def __hash__(self) -> int:
         return hash(self._data)
 
-    if not TYPE_CHECKING or cython.compiled:
+    if not TYPE_CHECKING:
 
         def __getitem__(self, key: Any) -> Any:
             return self._data[key]
 
-    def _get_by_key_impl_mapping(self, key: _KeyType) -> Any:
+    @cython.ccall
+    def _get_by_key_impl_mapping(self, key: _KeyType) -> object:
         return self._get_by_key_impl(key, False)
 
     @cython.cfunc
@@ -150,8 +151,24 @@ class BaseRow:
             return self._data[index]
         self._parent._key_not_found(key, attr_err)
 
+    @cython.cfunc
+    @cython.inline
+    def _getattribute_impl(self, name: str) -> object:
+        index: Optional[int] = self._key_to_index.get(name)
+        if index is not None:
+            return self._data[index]
+        return _attr_not_found
+
     def __getattr__(self, name: str) -> Any:
         return self._get_by_key_impl(name, True)
+
+    if cython.compiled:
+        def __getattribute__(self, name: str) -> Any:
+            if not name.startswith("_"):
+                attr = self._getattribute_impl(name)
+                if attr is not _attr_not_found:
+                    return attr
+            return super().__getattribute__(name)
 
     def _to_tuple_instance(self) -> Tuple[Any, ...]:
         return self._data
