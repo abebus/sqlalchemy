@@ -134,22 +134,27 @@ class BaseRow:
     def _to_tuple_instance(self) -> Tuple[Any, ...]:
         return self._data
 
+from cpython cimport PyTuple_New, PyTuple_SET_ITEM, PySequence_Length
 
-@cython.inline
-@cython.cfunc
-def _apply_processors(
-    proc: _ProcessorsType, data: Sequence[Any]
-) -> Tuple[Any, ...]:
-    res: List[Any] = list(data)
-    proc_size: cython.Py_ssize_t = len(proc)
+cpdef inline tuple _apply_processors(proc: _ProcessorsType, data: Sequence[Any]):
+    cdef:
+        Py_ssize_t proc_size
+        Py_ssize_t i
+        object p
+        object value
+        tuple res
+
+    proc_size = PySequence_Length(data)
+    res = <tuple>PyTuple_New(proc_size)
     # TODO: would be nice to do this only on the fist row
-    assert len(res) == proc_size
     for i in range(proc_size):
         p = proc[i]
         if p is not None:
-            res[i] = p(res[i])
-    return tuple(res)
-
+            value = p(data[i])
+        else:
+            value = data[i]
+        PyTuple_SET_ITEM(res, i, value)
+    return res
 
 # This reconstructor is necessary so that pickles with the Cy extension or
 # without use the same Binary format.

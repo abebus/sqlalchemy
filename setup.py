@@ -36,7 +36,7 @@ if DISABLE_EXTENSION and REQUIRE_EXTENSION:
 # it is tested in test_setup_defines_all_files
 CYTHON_MODULES = (
     "engine._processors_cy",
-    "engine._row_cy",
+    # "engine._row_cy",
     "engine._util_cy",
     "sql._util_cy",
     "util._collections_cy",
@@ -68,7 +68,12 @@ if HAS_CYTHON and IS_CPYTHON and not DISABLE_EXTENSION:
             )
             for module in CYTHON_MODULES
         ],
-    )
+    ) + [_cy_Extension(
+                f"{module_prefix}engine._row_cy",
+                sources=[f"{source_prefix}{"engine._row_cy".replace('.', '/')}.pyx"],
+                cython_directives=cython_directives,
+                optional=not REQUIRE_EXTENSION,
+            )]
 
     cmdclass = {"build_ext": _cy_build_ext}
 
